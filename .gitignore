@@ -1,17 +1,17 @@
+
 # Python
 __pycache__/
 *.py[cod]
 
-# Virtual environment
+# Virtual environments
 venv/
 .venv/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Local data files
+# Raw downloaded data (re-download using API)
 data/raw/*.csv
-data/processed/*.csv
 
 # Environment variables
 .env
@@ -22,3 +22,4 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
