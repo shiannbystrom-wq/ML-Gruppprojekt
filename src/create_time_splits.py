@@ -22,7 +22,9 @@ FEATURE_COLUMNS = [
     "ETH_MA30",
     "ETH_MA200",
     "ETH_Volatility30",
-    "BTC_ETH_Correlation30"
+    "BTC_ETH_Correlation30",
+    "ETH_SMA20W",
+    "ETH_EMA21W"
 ]
 
 def create_splits(df, horizon):
