@@ -65,6 +65,12 @@ df = load_csv(PRICE_FILE)
 # Läs in fullständig dataset
 df_stats = load_csv(ML_FILE)
 
+# Utökad trendhistorik från 2015
+TREND_FILE = DATA_DIR / "crypto_trends_2015.csv"
+
+df_trend_data = load_csv(TREND_FILE)
+
+
 # ============================================================
 # STEG 75 – HÄMTA SENASTE PRISER VIA COIN METRICS API
 # ============================================================
@@ -658,7 +664,7 @@ with tabs[2]:
         "5 år": 1825
     }
 
-    trend_df = df_stats.copy()
+    trend_df = df_trend_data.copy()
 
     if trend_period != "Hela historiken":
         start = trend_df["time"].max() - pd.Timedelta(
@@ -688,7 +694,7 @@ with tabs[2]:
     with c3:
         st.metric(
             "Antal nedåtgående trendbrott",
-            int(trend_df["Breakdown"].fillna(0).sum())
+            int(trend_df["Breakdown"].sum())
         )
 
     st.divider()
@@ -809,6 +815,255 @@ with tabs[2]:
     st.caption(
         "Historiska trendlinjer och trendbrott. "
         "Indikatorerna är inte köp- eller säljsignaler."
+    )
+
+    # ========================================================
+    # STEG 88 – ETH SMA 200 OCH BULL MARKET SUPPORT BAND
+    # ========================================================
+
+    st.divider()
+
+    st.header("Ethereum – Långsiktig trendanalys")
+
+    st.write(
+        "Vi undersöker Ethereums långsiktiga prisutveckling "
+        "med SMA 200 och Bull Market Support Band."
+    )
+
+    # Välj skala
+    price_scale = st.radio(
+        "Välj prisskala",
+        ["Linjär", "Logaritmisk"],
+        horizontal=True,
+        key="eth_trend_scale"
+    )
+
+    use_log = price_scale == "Logaritmisk"
+
+    # Använd vår historiska prisfil från 2015
+    eth_df = df[
+        ["time", "ETH_Price"]
+    ].copy()
+
+    eth_df = eth_df.sort_values("time")
+
+    eth_df["ETH_Price"] = pd.to_numeric(
+        eth_df["ETH_Price"],
+        errors="coerce"
+    )
+
+    # Ta bort perioder utan giltiga ETH-priser
+    eth_df = eth_df[
+        eth_df["ETH_Price"] > 0
+    ].copy()
+
+    # --------------------------------------------------------
+    # DEL 1 – SMA 200
+    # --------------------------------------------------------
+
+    st.subheader("1. Ethereum – SMA 200")
+
+    # 200 dagars glidande medelvärde
+    eth_df["SMA_200"] = (
+        eth_df["ETH_Price"]
+        .rolling(window=200, min_periods=200)
+        .mean()
+    )
+
+    fig_sma = px.line(
+        eth_df,
+        x="time",
+        y=["ETH_Price", "SMA_200"],
+        title="Ethereum – Pris och 200 dagars SMA"
+    )
+
+    fig_sma.update_layout(
+        xaxis_title="Datum",
+        yaxis_title="ETH-pris (USD)",
+        yaxis_type="log" if use_log else "linear",
+        hovermode="x unified",
+        height=550,
+        legend_title_text="Indikator"
+    )
+
+    fig_sma.update_xaxes(
+        rangeslider_visible=True
+    )
+
+    st.plotly_chart(
+        fig_sma,
+        width="stretch"
+    )
+
+    st.caption(
+        "SMA 200 visar medelpriset under de senaste "
+        "200 dagarna. De första 199 giltiga "
+        "observationerna saknar SMA-värde."
+    )
+
+    # --------------------------------------------------------
+    # DEL 2 – BULL MARKET SUPPORT BAND
+    # --------------------------------------------------------
+
+    st.divider()
+
+    st.subheader("2. Bull Market Support Band")
+
+    st.write(
+        "Bull Market Support Band består av "
+        "20 veckors SMA och 21 veckors EMA."
+    )
+
+    # Gör om dagliga priser till veckopriser
+    weekly = (
+        eth_df.set_index("time")["ETH_Price"]
+        .resample("W-SUN")
+        .last()
+        .dropna()
+        .to_frame()
+    )
+
+    # 20 veckors SMA
+    weekly["SMA_20W"] = (
+        weekly["ETH_Price"]
+        .rolling(window=20, min_periods=20)
+        .mean()
+    )
+
+    # 21 veckors EMA
+    weekly["EMA_21W"] = (
+        weekly["ETH_Price"]
+        .ewm(
+            span=21,
+            adjust=False,
+            min_periods=21
+        )
+        .mean()
+    )
+
+    # Bandets gränser
+    weekly["Upper_Band"] = weekly[
+        ["SMA_20W", "EMA_21W"]
+    ].max(axis=1)
+
+    weekly["Lower_Band"] = weekly[
+        ["SMA_20W", "EMA_21W"]
+    ].min(axis=1)
+
+    weekly = weekly.reset_index()
+
+    # Bygg interaktivt Plotly-diagram
+    fig_bmsb = go.Figure()
+
+    # Övre band
+    fig_bmsb.add_trace(go.Scatter(
+        x=weekly["time"],
+        y=weekly["Upper_Band"],
+        mode="lines",
+        line=dict(width=0),
+        showlegend=False,
+        hoverinfo="skip"
+    ))
+
+    # Nedre band med fyllning
+    fig_bmsb.add_trace(go.Scatter(
+        x=weekly["time"],
+        y=weekly["Lower_Band"],
+        mode="lines",
+        fill="tonexty",
+        fillcolor="rgba(46, 204, 113, 0.22)",
+        line=dict(width=0),
+        name="Bull Market Support Band",
+        hoverinfo="skip"
+    ))
+
+    # ETH-pris
+    fig_bmsb.add_trace(go.Scatter(
+        x=weekly["time"],
+        y=weekly["ETH_Price"],
+        mode="lines",
+        name="Ethereum",
+        line=dict(color="#5DADE2", width=1.5)
+    ))
+
+    # SMA 20 veckor
+    fig_bmsb.add_trace(go.Scatter(
+        x=weekly["time"],
+        y=weekly["SMA_20W"],
+        mode="lines",
+        name="20W SMA",
+        line=dict(color="#F39C12", width=2)
+    ))
+
+    # EMA 21 veckor
+    fig_bmsb.add_trace(go.Scatter(
+        x=weekly["time"],
+        y=weekly["EMA_21W"],
+        mode="lines",
+        name="21W EMA",
+        line=dict(color="#2ECC71", width=2)
+    ))
+
+    fig_bmsb.update_layout(
+        title="Ethereum – Bull Market Support Band",
+        xaxis_title="Datum",
+        yaxis_title="ETH-pris (USD)",
+        yaxis_type="log" if use_log else "linear",
+        hovermode="x unified",
+        height=600
+    )
+
+    fig_bmsb.update_xaxes(
+        rangeslider_visible=True
+    )
+
+    st.plotly_chart(
+        fig_bmsb,
+        width="stretch"
+    )
+
+    st.caption(
+        "BMSB beräknas från ETH-prisets sista "
+        "tillgängliga observation varje vecka. "
+        "Veckorna avslutas på söndagar (UTC). "
+        "Indikatorn beskriver historisk trend och "
+        "är inte en verifierad prognosmodell."
+    )
+
+    # --------------------------------------------------------
+    # DEL 3 – NYCKELTAL
+    # --------------------------------------------------------
+
+    st.divider()
+
+    st.subheader("3. Senaste trendindikatorer")
+
+    latest_eth = eth_df.iloc[-1]
+    latest_week = weekly.iloc[-1]
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "ETH-pris",
+            f"${latest_eth['ETH_Price']:,.2f}"
+        )
+
+    with col2:
+        st.metric(
+            "SMA 200",
+            f"${latest_eth['SMA_200']:,.2f}"
+        )
+
+    with col3:
+        st.metric(
+            "20W SMA",
+            f"${latest_week['SMA_20W']:,.2f}"
+        )
+
+    st.caption(
+        f"Senaste veckobaserade observation: "
+        f"{latest_week['time']:%Y-%m-%d} UTC"
     )
 
 
