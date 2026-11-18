@@ -1,5 +1,7 @@
 # ETH köpzoner – tidsserie, glidande medelvärden och ETH/BTC
 
+**🔗 Live-app:** [eth-kopzoner.streamlit.app](https://eth-kopzoner.streamlit.app/)
+
 En Streamlit-app som visar Ethereums prishistorik, pekar ut historiska köpzoner med en rullande
 trendmodell och undersöker hur ETH hänger ihop med Bitcoin. Alla vyer förklaras så att de går att
 förstå utan teknisk bakgrund.
@@ -7,7 +9,7 @@ förstå utan teknisk bakgrund.
 Bygger på gruppens tvättade dataset `data/processed/crypto_dataset.csv`
 (samma data som i `2_ethereum_accumulation_zones`-notebooken).
 
-## Kör appen
+## Kör appen lokalt
 
 Från projektets rotmapp, med projektets `.venv` aktiverad:
 
